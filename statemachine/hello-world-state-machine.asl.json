@@ -9,7 +9,7 @@
         "Method": "GET",
         "ApiEndpoint": "https://api.restful-api.dev/objects",
         "InvocationConfig": {
-          "ConnectionArn": "arn:aws:events:eu-west-1:102242991276:connection/RestApiConnection/471238a2-fcd0-491a-b7b0-ba972b61ea45"
+          "ConnectionArn": "${ApiConnectionArn}"
         }
       },
       "ResultSelector": {
