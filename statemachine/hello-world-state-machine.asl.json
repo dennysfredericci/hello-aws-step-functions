@@ -1,0 +1,22 @@
+{
+  "Comment": "Step Function with HTTP API call",
+  "StartAt": "CallHTTPAPI",
+  "States": {
+    "CallHTTPAPI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::http:invoke",
+      "Parameters": {
+        "Method": "GET",
+        "ApiEndpoint": "https://api.restful-api.dev/objects",
+        "InvocationConfig": {
+          "ConnectionArn": "arn:aws:events:eu-west-1:102242991276:connection/RestApiConnection/471238a2-fcd0-491a-b7b0-ba972b61ea45"
+        }
+      },
+      "ResultSelector": {
+        "statusCode.$": "$.StatusCode",
+        "payload.$": "$.ResponseBody"
+      },
+      "End": true
+    }
+  }
+}

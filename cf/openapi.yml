@@ -1,0 +1,39 @@
+openapi: 3.0.1
+info:
+  version: 2021-06-01T00:00:00Z
+  title: helloworld-step-functions-api
+paths:
+  /:
+    post:
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:states:action/StartSyncExecution"
+        credentials:
+          Fn::GetAtt: [ ApiGatewayRole, Arn ]
+        responses:
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                $input#set($outputJson = $util.parseJson($input.body).output)                
+                #set($inputRoot = $input.path('$'))
+                #if($inputRoot.output.statusCode)
+                  #set($context.responseOverride.status = $inputRoot.output.statusCode)
+                #end
+                $outputJson
+
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                {
+                  "input": "$input.body",
+                  "stateMachineArn": "${HelloWorldServerlessStateMachine}"
+                }
+              - { HelloWorldServerlessStateMachine: { "Ref": "HelloWorldServerlessStateMachine" } }
+        passthroughBehavior: when_no_templates
+        httpMethod: POST
+        type: aws
+      responses:
+        "200":
+          description: "Successful execution"

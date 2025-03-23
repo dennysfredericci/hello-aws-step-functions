@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: 'AWS::Serverless-2016-10-31'
+
+Resources:
+
+  StepFunctionsExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'states.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:*'
+                  - 'events:InvokeConnection'
+                  - 'states:InvokeHTTPEndpoint'
+                  - 'events:RetrieveConnectionCredentials'
+                  - 'secretsmanager:DescribeSecret'
+                  - 'secretsmanager:GetSecretValue'
+                Resource: '*'
+
+  ApiConnection:
+    Type: 'AWS::Events::Connection'
+    Properties:
+      Name: RestApiConnection
+      AuthorizationType: API_KEY
+      AuthParameters:
+        ApiKeyAuthParameters:
+          ApiKeyName: dummy
+          ApiKeyValue: dummy
+
+  StateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      #LogGroupName: !Sub "helloworld-serverless-statemachine/statemachine"
+      RetentionInDays: 1
+
+  HelloWorldServerlessStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Type: EXPRESS
+      Name: helloworld-serverless-statemachine
+      DefinitionUri: ../statemachine/hello-world-state-machine.asl.json
+      Role: !GetAtt StepFunctionsExecutionRole.Arn
+      Logging:
+        IncludeExecutionData: true
+        Level: ALL
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt StateMachineLogGroup.Arn
+      Tracing:
+        Enabled: true
+      DefinitionSubstitutions:
+        ApiConnectionArn: !GetAtt ApiConnection.Arn
+
+  HttpApiRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "apigateway.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: ApiDirectWriteToSQS
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Action:
+                - states:StartSyncExecution
+              Effect: Allow
+              Resource:
+                - !Ref HelloWorldServerlessStateMachine
+
+  ApiGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "apigateway.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: StepFunctionsExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Action:
+                - states:StartSyncExecution
+              Effect: Allow
+              Resource:
+                - !Ref HelloWorldServerlessStateMachine
+
+
+  HttpApi:
+    DependsOn: HelloWorldServerlessStateMachine
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        'Fn::Transform':
+          Name: AWS::Include
+          Parameters:
+            Location: ./openapi.yml
+
+Outputs:
+  ApiUrlOut:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
